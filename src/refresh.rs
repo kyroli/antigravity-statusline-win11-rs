@@ -50,8 +50,7 @@ pub fn run_background_refresh(cwd_force: Option<String>) {
         || quota_age > 120
         || last_config_update > cache_modified_secs
         || token_changed)
-        && token_opt.is_some()
-        && existing_cache.needs_login != Some(true);
+        && token_opt.is_some();
 
     if token_opt.is_none() {
         existing_cache.token_hash = None;
@@ -167,6 +166,7 @@ fn collect_git_status(cwd: &str, now: u64, cache: &mut CacheData) {
     if let Some(branch) = get_git_branch_fast(cwd) {
         git_branch = branch;
         if let Ok(status_out) = Command::new("git")
+            .env("GIT_OPTIONAL_LOCKS", "0")
             .args(["status", "--porcelain"])
             .current_dir(cwd)
             .output()
@@ -181,6 +181,7 @@ fn collect_git_status(cwd: &str, now: u64, cache: &mut CacheData) {
         }
 
         if let Ok(rev_out) = Command::new("git")
+            .env("GIT_OPTIONAL_LOCKS", "0")
             .args(["rev-list", "--left-right", "--count", "HEAD...@{u}"])
             .current_dir(cwd)
             .output()

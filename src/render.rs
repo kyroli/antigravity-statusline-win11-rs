@@ -88,8 +88,9 @@ fn get_info_widgets(theme: &Theme, json: &InputJson, cache: &CacheData, step: us
                 if let Some(ref status) = agent.status {
                     if !status.is_empty() && status != "idle" {
                         let mut short_status = status.to_uppercase();
-                        if short_status.len() > 16 {
-                            short_status = format!("{}..", &short_status[..14]);
+                        let char_count = short_status.chars().count();
+                        if char_count > 16 {
+                            short_status = format!("{}..", short_status.chars().take(14).collect::<String>());
                         }
                         format!("{}{}[{}]{}", p.accent, BOLD, short_status, RESET)
                     } else {
@@ -189,12 +190,13 @@ fn get_info_widgets(theme: &Theme, json: &InputJson, cache: &CacheData, step: us
     if let Some(ref vcs) = cache.vcs {
         if vcs.cwd == raw_cwd && !vcs.branch.is_empty() && step < 6 {
             let mut branch_text = vcs.branch.clone();
+            let char_count = branch_text.chars().count();
             if step >= 4 {
-                if branch_text.len() > 10 {
-                    branch_text = format!("{}..", &branch_text[..8]);
+                if char_count > 10 {
+                    branch_text = format!("{}..", branch_text.chars().take(8).collect::<String>());
                 }
-            } else if branch_text.len() > 15 {
-                branch_text = format!("{}..", &branch_text[..12]);
+            } else if char_count > 15 {
+                branch_text = format!("{}..", branch_text.chars().take(12).collect::<String>());
             }
             let icon = theme::get_icon("vcs");
             let label = format!("{}{}", icon, branch_text);
@@ -230,25 +232,7 @@ fn get_info_widgets(theme: &Theme, json: &InputJson, cache: &CacheData, step: us
         }
     }
 
-    // Metadata (low step only)
-    if step < 2 {
-        if let Some(ref email) = json.email {
-            if !email.is_empty() {
-                list.push(Widget::new(email.to_string()));
-            }
-        }
-        if let Some(ref ver) = json.version {
-            if !ver.is_empty() {
-                list.push(Widget::new(format!("v{}", ver)));
-            }
-        }
-        if let Some(ref cid) = json.conversation_id {
-            if !cid.is_empty() {
-                let limit = std::cmp::min(8, cid.len());
-                list.push(Widget::new(format!("id:{}", &cid[..limit])));
-            }
-        }
-    }
+
 
     list
 }

@@ -257,7 +257,7 @@ pub fn get_git_branch_fast(cwd: &str) -> Option<String> {
                     if let Some(ref_path) = line.strip_prefix("ref: refs/heads/") {
                         return Some(ref_path.to_string());
                     } else {
-                        return Some(line[..std::cmp::min(8, line.len())].to_string());
+                        return Some(line.chars().take(8).collect::<String>());
                     }
                 }
             } else if git_dir.is_file() {
@@ -276,9 +276,7 @@ pub fn get_git_branch_fast(cwd: &str) -> Option<String> {
                                 if let Some(ref_path) = line.strip_prefix("ref: refs/heads/") {
                                     return Some(ref_path.to_string());
                                 } else {
-                                    return Some(
-                                        line[..std::cmp::min(8, line.len())].to_string(),
-                                    );
+                                    return Some(line.chars().take(8).collect::<String>());
                                 }
                             }
                         }

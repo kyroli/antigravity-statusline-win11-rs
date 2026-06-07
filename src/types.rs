@@ -127,11 +127,7 @@ pub struct LockContent {
 
 pub fn parse_input_json(input: &str) -> InputJson {
     let clean_input = input.trim();
-    let clean_input = if clean_input.starts_with('\u{feff}') {
-        &clean_input[3..]
-    } else {
-        clean_input
-    };
+    let clean_input = clean_input.strip_prefix('\u{feff}').unwrap_or(clean_input);
 
     if !clean_input.is_empty() {
         if let Ok(parsed) = serde_json::from_str::<InputJson>(clean_input) {
