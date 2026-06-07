@@ -211,6 +211,7 @@ pub struct SharedVcsInfo {
 pub struct SharedCacheData {
     pub magic: u32,
     pub version: u32,
+    pub seq: u32,
     pub last_refreshed: u64,
     pub quota_count: u32,
     pub quotas: [SharedQuotaItem; 16],
@@ -329,7 +330,8 @@ impl SharedCacheData {
 
         SharedCacheData {
             magic: 0x41475953,
-            version: 5,
+            version: 6,
+            seq: 0,
             last_refreshed: data.last_refreshed,
             quota_count: quota_count as u32,
             quotas,
@@ -362,8 +364,24 @@ pub fn read_shared_cache() -> Option<CacheData> {
         }
         let shared_data = &*(view.Value as *const SharedCacheData);
         let mut result = None;
-        if shared_data.magic == 0x41475953 && shared_data.version == 5 {
-            result = Some(shared_data.to_cache_data());
+        if shared_data.magic == 0x41475953 && shared_data.version == 6 {
+            let mut attempts = 0;
+            loop {
+                let seq1 = unsafe { std::ptr::read_volatile(&shared_data.seq) };
+                std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+                let cached = shared_data.to_cache_data();
+                std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+                let seq2 = unsafe { std::ptr::read_volatile(&shared_data.seq) };
+                if seq1 == seq2 && seq1 % 2 == 0 {
+                    result = Some(cached);
+                    break;
+                }
+                attempts += 1;
+                if attempts >= 3 {
+                    break;
+                }
+                std::thread::yield_now();
+            }
         }
         UnmapViewOfFile(view);
         CloseHandle(handle);
@@ -401,7 +419,27 @@ pub fn write_shared_cache(data: &CacheData) -> bool {
             return false;
         }
         let shared_data = view.Value as *mut SharedCacheData;
-        *shared_data = SharedCacheData::from_cache_data(data);
+        let mut current_seq = unsafe { std::ptr::read_volatile(&mut (*shared_data).seq) };
+        if current_seq % 2 == 0 {
+            current_seq = current_seq.wrapping_add(1);
+        } else {
+            current_seq = current_seq.wrapping_add(2);
+        }
+        unsafe {
+            std::ptr::write_volatile(&mut (*shared_data).seq, current_seq);
+        }
+        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+
+        let mut new_data = SharedCacheData::from_cache_data(data);
+        new_data.seq = current_seq;
+        unsafe {
+            std::ptr::write(shared_data, new_data);
+        }
+        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+
+        unsafe {
+            std::ptr::write_volatile(&mut (*shared_data).seq, current_seq.wrapping_add(1));
+        }
         UnmapViewOfFile(view);
         CloseHandle(handle);
         true

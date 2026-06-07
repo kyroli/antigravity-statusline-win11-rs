@@ -184,10 +184,11 @@ fn get_info_widgets(theme: &Theme, json: &InputJson, cache: &CacheData, step: us
         };
         let icon = theme::get_icon("path");
         let formatted_cwd = raw_cwd.replace('\\', "/");
-        let file_url = if formatted_cwd.starts_with('/') {
-            format!("file://{}", formatted_cwd)
+        let encoded_cwd = percent_encode_path(&formatted_cwd);
+        let file_url = if encoded_cwd.starts_with('/') {
+            format!("file://{}", encoded_cwd)
         } else {
-            format!("file:///{}", formatted_cwd)
+            format!("file:///{}", encoded_cwd)
         };
         let linked_text = format!("\x1b]8;;{}\x1b\\{}{}\x1b]8;;\x1b\\", file_url, icon, path_text);
         list.push(Widget::new(format!("{}{}{}", p.label, linked_text, RESET)));
@@ -482,4 +483,19 @@ pub fn render_tui(config: &UserConfig, json: &InputJson, cache: &CacheData) {
             println!("{}", row);
         }
     }
+}
+
+fn percent_encode_path(path: &str) -> String {
+    let mut encoded = String::with_capacity(path.len() * 3);
+    for byte in path.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' | b':' => {
+                encoded.push(byte as char);
+            }
+            _ => {
+                encoded.push_str(&format!("%{:02X}", byte));
+            }
+        }
+    }
+    encoded
 }
